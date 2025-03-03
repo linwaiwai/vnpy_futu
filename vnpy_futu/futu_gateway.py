@@ -461,7 +461,7 @@ class FutuGateway(BaseGateway):
         history_df["time_key"] = history_df["time_key"] - pd.Timedelta(1, "m")
         history_df["time_key"] = history_df["time_key"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        for ix, row in history_df.iterrows():
+        for ix, row in all_data.iterrows():
             bar: BarData = BarData(
                 gateway_name=self.gateway_name,
                 symbol=req.symbol,
