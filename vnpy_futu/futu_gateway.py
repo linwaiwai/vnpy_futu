@@ -369,19 +369,42 @@ class FutuGateway(BaseGateway):
             self.write_log(f"查询持仓失败：{data}")
             return
 
+        # 使用字典存储累计持仓数据
+        position_dict = {}
+        
         for ix, row in data.iterrows():
             symbol, exchange = convert_symbol_futu2vt(row["code"])
-            pos: PositionData = PositionData(
-                symbol=symbol,
-                exchange=exchange,
-                direction=Direction.NET,
-                volume=row["qty"],
-                frozen=(float(row["qty"]) - float(row["can_sell_qty"])),
-                price=float(row["cost_price"]),
-                pnl=float(row["pl_val"]),
-                gateway_name=self.gateway_name,
-            )
+            key = f"{symbol}_{exchange}"
+            
+            qty = float(row["qty"])
+            frozen = float(row["qty"]) - float(row["can_sell_qty"])
+            cost = float(row["cost_price"])
+            pnl = float(row["pl_val"])
+            
+            if key in position_dict:
+                # 累加已存在持仓的数据
+                pos = position_dict[key]
+                pos.volume += qty
+                pos.frozen += frozen
+                # 更新持仓均价
+                pos.price = (pos.price * (pos.volume - qty) + cost * qty) / pos.volume if pos.volume else 0
+                pos.pnl += pnl
+            else:
+                # 创建新的持仓数据
+                pos = PositionData(
+                    symbol=symbol,
+                    exchange=exchange,
+                    direction=Direction.NET,
+                    volume=qty,
+                    frozen=frozen,
+                    price=cost,
+                    pnl=pnl,
+                    gateway_name=self.gateway_name,
+                )
+                position_dict[key] = pos
 
+        # 推送累计后的持仓数据
+        for pos in position_dict.values():
             self.on_position(pos)
 
     def query_order(self) -> None:
